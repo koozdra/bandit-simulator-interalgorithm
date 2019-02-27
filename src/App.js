@@ -1,7 +1,7 @@
 import React, { Component } from "react";
 import Chart from "react-c3-component";
 import "c3/c3.css";
-import { Button, Form, FormGroup } from "reactstrap";
+import { Button, Form, FormGroup, Collapse } from "reactstrap";
 
 const blob = new Blob(["(" + require("./worker.js") + ")()"]);
 const {
@@ -12,6 +12,7 @@ const {
   flow,
   range,
   reduce,
+  includes,
   zipAll,
   sum,
   get,
@@ -19,7 +20,7 @@ const {
 } = require("lodash/fp");
 const mapWithIndex = require("lodash/fp/map").convert({ cap: false });
 
-function simulate(candidates) {
+function simulate(candidates, pullsPerSimulation) {
   let outstandingSimulations = candidates.length;
   let output = {
     cumulativeRegret: [],
@@ -32,7 +33,7 @@ function simulate(candidates) {
 
       worker.postMessage({
         messageType: "start",
-        data: candidate,
+        data: { ...candidate, iterations: pullsPerSimulation },
         index
       });
 
@@ -67,6 +68,8 @@ function CandidateAlgorithm(props) {
   } = props;
   const algorithms = {
     "epsilon-greedy": "Epsilon Greedy",
+    "epsilon-greedy-complement-explore":
+      "Epsilon Greedy with Complement Explore",
     "epsilon-greedy-decay": "Epsilon Greedy Decay"
   };
   const algorithmTypes = keys(algorithms);
@@ -137,7 +140,10 @@ function CandidateAlgorithm(props) {
           />
         </label>
       </FormGroup>
-      {candidate.type === "epsilon-greedy" && (
+      {includes(candidate.type)([
+        "epsilon-greedy-complement-explore",
+        "epsilon-greedy"
+      ]) && (
         <FormGroup style={{ display: "inline-block", marginRight: "10px" }}>
           <label>
             Epsilon:{" "}
@@ -247,6 +253,7 @@ function CandidateAlgorithm(props) {
 const adderCandidate = {
   minVisits: 10,
   delay: 50,
+  decayFactor: 7,
   epsilon: 0.1,
   type: "epsilon-greedy",
   iterations: 1000,
@@ -265,7 +272,8 @@ class App extends Component {
     this.state = {
       candidates: [adderCandidate],
       numSimulations: 10,
-      pullsPerSimulation: 1000
+      pullsPerSimulation: 1000,
+      isOpenBookmarks: false
     };
 
     bindAll(["addCandidate", "stateChange"])(this);
@@ -288,60 +296,194 @@ class App extends Component {
       chartDataCumulativeRegret,
       chartDataCumulativeReward,
       numSimulations,
-      pullsPerSimulation
+      pullsPerSimulation,
+      isOpenBookmarks
     } = this.state;
 
     return (
       <div className="App">
-        Bookmarks:{" "}
-        <a
-          href="#"
-          onClick={() => {
-            const template = {
-              variants: [
-                { ev: 0.1, r: 1 },
-                { ev: 0.3, r: 1 },
-                { ev: 0.7, r: 1 },
-                { ev: 0.9, r: 1 }
-              ],
-              minVisits: "10",
-              delay: "10"
-            };
-            const candidates = [
-              { type: "epsilon-greedy", epsilon: "0.1", ...template },
-              { type: "epsilon-greedy", epsilon: "0.3", ...template },
-              { type: "epsilon-greedy", epsilon: "0.7", ...template },
-              { type: "epsilon-greedy", epsilon: "1", ...template }
-            ];
-            this.setState({ candidates });
-          }}
+        <Button
+          onClick={() => this.setState({ isOpenBookmarks: !isOpenBookmarks })}
         >
-          Different values for epsilon (four variants)
-        </a>
-        <a
-          href="#"
-          onClick={() => {
-            const variants = [
-              { ev: 0.1, r: 1 },
-              { ev: 0.2, r: 1 },
-              { ev: 0.3, r: 1 },
-              { ev: 0.4, r: 1 },
-              { ev: 0.5, r: 1 },
-              { ev: 0.6, r: 1 },
-              { ev: 0.7, r: 1 },
-              { ev: 0.9, r: 1 },
-              { ev: 0.9, r: 1 },
-              { ev: 0.9, r: 1 }
-            ];
-            const candidates = [
-              { type: "epsilon-greedy", variants, epsilon: "0.1" },
-              { type: "epsilon-greedy-decay", variants, factor: "7" }
-            ];
-            this.setState({ candidates });
-          }}
-        >
-          Epsilon greedy vs decay (ten variants)
-        </a>
+          Bookmarks
+        </Button>
+        <Collapse isOpen={isOpenBookmarks}>
+          Bookmarks:{" "}
+          <div style={{ paddingLeft: 10 }}>
+            <a
+              href="#"
+              onClick={() => {
+                const template = {
+                  variants: [
+                    { ev: 0.1, r: 1 },
+                    { ev: 0.3, r: 1 },
+                    { ev: 0.7, r: 1 },
+                    { ev: 0.9, r: 1 }
+                  ],
+                  minVisits: "10",
+                  delay: "10"
+                };
+                const candidates = [
+                  { type: "epsilon-greedy", epsilon: "0.1", ...template },
+                  { type: "epsilon-greedy", epsilon: "0.3", ...template },
+                  { type: "epsilon-greedy", epsilon: "0.7", ...template },
+                  { type: "epsilon-greedy", epsilon: "1", ...template }
+                ];
+                this.setState({ candidates });
+              }}
+            >
+              Different values for epsilon (four variants)
+            </a>
+            <br />
+            <a
+              href="#"
+              onClick={() => {
+                const template = {
+                  variants: [
+                    { ev: 0.1, r: 1 },
+                    { ev: 0.2, r: 1 },
+                    { ev: 0.3, r: 1 },
+                    { ev: 0.4, r: 1 },
+                    { ev: 0.5, r: 1 },
+                    { ev: 0.6, r: 1 },
+                    { ev: 0.7, r: 1 },
+                    { ev: 0.9, r: 1 }
+                  ],
+                  minVisits: "10",
+                  delay: "10"
+                };
+                const candidates = [
+                  { type: "epsilon-greedy", epsilon: "0.1", ...template },
+                  {
+                    type: "epsilon-greedy-decay",
+                    decayFactor: "7",
+                    ...template
+                  }
+                ];
+                this.setState({ candidates });
+              }}
+            >
+              Epsilon greedy vs decay (nine variants)
+            </a>
+            <br />
+            <a
+              href="#"
+              onClick={() => {
+                const template = {
+                  variants: [
+                    { ev: 0.3, r: 1 },
+                    { ev: 0.4, r: 1 },
+                    { ev: 0.5, r: 1 },
+                    { ev: 0.6, r: 1 }
+                  ],
+                  minVisits: "10",
+                  delay: "10"
+                };
+                const candidates = [
+                  {
+                    type: "epsilon-greedy-decay",
+                    decayFactor: "1",
+                    ...template
+                  },
+                  {
+                    type: "epsilon-greedy-decay",
+                    decayFactor: "4",
+                    ...template
+                  },
+                  {
+                    type: "epsilon-greedy-decay",
+                    decayFactor: "7",
+                    ...template
+                  },
+                  {
+                    type: "epsilon-greedy-decay",
+                    decayFactor: "15",
+                    ...template
+                  }
+                ];
+                this.setState({ candidates });
+              }}
+            >
+              Epsilon greedy decay with different decay factors
+            </a>
+            <br />
+            <a
+              href="#"
+              onClick={() => {
+                const template = {
+                  variants: [
+                    { ev: 0.3, r: 1 },
+                    { ev: 0.4, r: 1 },
+                    { ev: 0.7, r: 1 },
+                    { ev: 0.9, r: 1 }
+                  ],
+                  minVisits: "10"
+                };
+                const candidates = [
+                  {
+                    type: "epsilon-greedy",
+                    epsilon: "0.1",
+                    delay: 10,
+                    ...template
+                  },
+                  {
+                    type: "epsilon-greedy",
+                    epsilon: "0.1",
+                    delay: 50,
+                    ...template
+                  },
+                  {
+                    type: "epsilon-greedy",
+                    epsilon: "0.1",
+                    delay: 100,
+                    ...template
+                  },
+                  {
+                    type: "epsilon-greedy",
+                    epsilon: "0.1",
+                    delay: 300,
+                    ...template
+                  }
+                ];
+                this.setState({ candidates });
+              }}
+            >
+              Epsilon greedy with different delays
+            </a>
+            <br />
+            <a
+              href="#"
+              onClick={() => {
+                const template = {
+                  variants: [
+                    { ev: 0.3, r: 1 },
+                    { ev: 0.4, r: 1 },
+                    { ev: 0.7, r: 1 },
+                    { ev: 0.9, r: 1 }
+                  ],
+                  minVisits: "10"
+                };
+                const candidates = [
+                  {
+                    type: "epsilon-greedy",
+                    epsilon: "0.1",
+                    delay: 10,
+                    ...template
+                  },
+                  {
+                    type: "epsilon-greedy-complement-explore",
+                    epsilon: "0.1",
+                    delay: 10,
+                    ...template
+                  }
+                ];
+                this.setState({ candidates });
+              }}
+            >
+              Epsilon greedy vs epsilon greedy with complement explore
+            </a>
+          </div>
+        </Collapse>
         <Form>
           Options:
           <div
@@ -460,7 +602,7 @@ class App extends Component {
             const thunks = flow(
               range(0),
               map(() => async () => {
-                const data = await simulate(candidates);
+                const data = await simulate(candidates, pullsPerSimulation);
                 this.setState(state => ({
                   outstandingSimulations: state.outstandingSimulations - 1
                 }));
@@ -469,6 +611,8 @@ class App extends Component {
             )(numSimulations);
 
             const simulationData = await executeSequentially(thunks);
+
+            console.log(simulationData);
 
             const divideBy = diviser => n => n / diviser;
 
@@ -505,10 +649,27 @@ class App extends Component {
           }}
         >
           Run!
-        </Button>
+        </Button>{" "}
+        {!outstandingSimulations &&
+          chartDataCumulativeReward &&
+          chartDataCumulativeRegret && (
+            <Button
+              size="lg"
+              color="warning"
+              outline
+              onClick={() =>
+                this.setState({
+                  chartDataCumulativeReward: undefined,
+                  chartDataCumulativeRegret: undefined
+                })
+              }
+            >
+              Clear
+            </Button>
+          )}
         {outstandingSimulations ? (
           <div>
-            <stong>Working: {outstandingSimulations}</stong>
+            <strong>Working: {outstandingSimulations}</strong>
           </div>
         ) : (
           <div>
@@ -526,7 +687,7 @@ class App extends Component {
             )}
             {chartDataCumulativeRegret && (
               <React.Fragment>
-                <h3>Cumulative Reward</h3>
+                <h3>Cumulative Regret</h3>
                 <div style={{ width: "100%", height: "400px" }}>
                   <Chart
                     config={{
