@@ -70,7 +70,8 @@ function CandidateAlgorithm(props) {
     "epsilon-greedy": "Epsilon Greedy",
     "epsilon-greedy-complement-explore":
       "Epsilon Greedy with Complement Explore",
-    "epsilon-greedy-decay": "Epsilon Greedy Decay"
+    "epsilon-greedy-decay": "Epsilon Greedy Decay",
+    softmax: "Softmax"
   };
   const algorithmTypes = keys(algorithms);
   const { variants = [] } = candidate;
@@ -167,12 +168,30 @@ function CandidateAlgorithm(props) {
             Decay Factor:{" "}
             <input
               type="number"
-              step="0.1"
-              min="0"
-              max="1"
+              step="1"
+              min="1"
+              max="1000"
               value={candidate.decayFactor}
               onChange={({ target: { value } }) =>
-                stateChange(`candidates.${index}.epsilon`, value)
+                stateChange(`candidates.${index}.decayFactor`, value)
+              }
+            />
+          </label>
+        </FormGroup>
+      )}
+      {candidate.type === "softmax" && (
+        <FormGroup style={{ display: "inline-block", marginRight: "10px" }}>
+          {" "}
+          <label>
+            Temperature:{" "}
+            <input
+              type="number"
+              step="1"
+              min="1"
+              max="1000"
+              value={candidate.tau}
+              onChange={({ target: { value } }) =>
+                stateChange(`candidates.${index}.tau`, value)
               }
             />
           </label>
@@ -255,6 +274,7 @@ const adderCandidate = {
   delay: 50,
   decayFactor: 7,
   epsilon: 0.1,
+  tau: 0.1,
   type: "epsilon-greedy",
   iterations: 1000,
   variants: [
@@ -481,6 +501,95 @@ class App extends Component {
               }}
             >
               Epsilon greedy vs epsilon greedy with complement explore
+            </a>
+            <br />
+            <a
+              href="#"
+              onClick={() => {
+                const template = {
+                  variants: [
+                    { ev: 0.3, r: 1 },
+                    { ev: 0.4, r: 1 },
+                    { ev: 0.7, r: 1 },
+                    { ev: 0.9, r: 1 }
+                  ],
+                  minVisits: "10",
+                  epsilon: "0.1",
+                  delay: 10
+                };
+                const candidates = [
+                  {
+                    type: "softmax",
+                    tau: "0.1",
+                    ...template
+                  },
+                  {
+                    type: "softmax",
+                    tau: "0.3",
+                    ...template
+                  },
+                  {
+                    type: "softmax",
+                    tau: "0.7",
+                    ...template
+                  },
+                  {
+                    type: "softmax",
+                    tau: "1",
+                    ...template
+                  },
+                  {
+                    type: "softmax",
+                    tau: "2",
+                    ...template
+                  },
+                  {
+                    type: "softmax",
+                    tau: "5",
+                    ...template
+                  }
+                ];
+                this.setState({ candidates });
+              }}
+            >
+              Softmax with different temperatures
+            </a>
+            <br />
+            <a
+              href="#"
+              onClick={() => {
+                const template = {
+                  variants: [
+                    { ev: 0.3, r: 1 },
+                    { ev: 0.4, r: 1 },
+                    { ev: 0.7, r: 1 },
+                    { ev: 0.9, r: 1 }
+                  ],
+                  minVisits: "10",
+                  epsilon: "0.1",
+                  delay: 10
+                };
+                const candidates = [
+                  {
+                    type: "softmax",
+                    tau: "0.1",
+                    ...template
+                  },
+                  {
+                    type: "epsilon-greedy",
+                    tau: "0.1",
+                    ...template
+                  },
+                  {
+                    type: "epsilon-greedy-decay",
+                    decayFactor: "7",
+                    ...template
+                  }
+                ];
+                this.setState({ candidates });
+              }}
+            >
+              Softmax vs Epsilon Greedy vs Epsilon Greedy Decay
             </a>
           </div>
         </Collapse>

@@ -40,6 +40,19 @@ module.exports = () => {
       ? 0
       : variant.bandit.rewards / variant.bandit.pulls;
 
+  // data: an array of floats where sum(float) =ish 1
+  // r: a unit random [0,1), eroded with each recursive call
+  // index: current index being searched
+  const indexByRandom = (data, r, index) => {
+    const val = data[index];
+
+    if (r - val <= 0) {
+      return index;
+    }
+
+    return indexByRandom(data, r - val, index + 1);
+  };
+
   const epsilonCalculation = {
     "epsilon-greedy": (factor, epsilon, variants) => epsilon,
     "epsilon-greedy-complement-explore": (factor, epsilon, variants) => epsilon,
@@ -59,7 +72,7 @@ module.exports = () => {
   };
 
   const variantSelection = {
-    "epsilon-greedy": (factor, epsilon, minExploreVisits, variants) => {
+    "epsilon-greedy": ({ factor, epsilon, minExploreVisits, variants }) => {
       const variantsBelowMinVisits = filter(
         variant => variant.bandit.pulls < minExploreVisits
       )(variants);
@@ -82,12 +95,12 @@ module.exports = () => {
 
       return maxBy(variantExpectedValue)(variants);
     },
-    "epsilon-greedy-complement-explore": (
+    "epsilon-greedy-complement-explore": ({
       factor,
       epsilon,
       minExploreVisits,
       variants
-    ) => {
+    }) => {
       const variantsBelowMinVisits = filter(
         variant => variant.bandit.pulls < minExploreVisits
       )(variants);
@@ -122,29 +135,6 @@ module.exports = () => {
           complements
         );
 
-        // console.log(
-        //   "karen",
-        //   variants,
-        //   totalPulls,
-        //   complements,
-        //   complementTotal,
-        //   complementProbabilities,
-        //   sum(complementProbabilities)
-        // );
-
-        // data: an array of floats where sum(float) =ish 1
-        // r: a unit random [0,1), eroded with each recursive call
-        // index: current index being searched
-        const indexByRandom = (data, r, index) => {
-          const val = data[index];
-
-          if (r - val <= 0) {
-            return index;
-          }
-
-          return indexByRandom(data, r - val, index + 1);
-        };
-
         const selectedVariantIndex = indexByRandom(
           complementProbabilities,
           Math.random(),
@@ -155,7 +145,7 @@ module.exports = () => {
 
       return maxBy(variantExpectedValue)(variants);
     },
-    "epsilon-greedy-decay": (factor, epsilon, minExploreVisits, variants) => {
+    "epsilon-greedy-decay": ({ factor, epsilon, variants }) => {
       const isExplore =
         Math.random() <
         epsilonCalculation["epsilon-greedy-decay"](factor, epsilon, variants);
@@ -165,6 +155,27 @@ module.exports = () => {
       }
 
       return maxBy(variantExpectedValue)(variants);
+    },
+    softmax: ({ tau, minExploreVisits, variants }) => {
+      const variantExpo = tau => variant => {
+        const ev = variantExpectedValue(variant);
+        return Math.exp(ev / tau);
+      };
+      const totalExpectedValues = flow(
+        map(variantExpo(tau)),
+        sum
+      )(variants);
+
+      const variantExpoedList = map(variant => {
+        return variantExpo(tau)(variant) / totalExpectedValues;
+      })(variants);
+
+      const selectedVariantIndex = indexByRandom(
+        variantExpoedList,
+        Math.random(),
+        0
+      );
+      return variants[selectedVariantIndex];
     }
   };
 
@@ -175,14 +186,16 @@ module.exports = () => {
     minVisits,
     variants,
     delay,
-    step
+    step,
+    tau
   }) => {
-    const selectedVariant = variantSelection[type](
-      decayFactor,
+    const selectedVariant = variantSelection[type]({
+      factor: decayFactor,
       epsilon,
-      minVisits,
-      variants
-    );
+      minExploreVisits: minVisits,
+      variants,
+      tau
+    });
 
     const { index, ev, reward = 1 } = selectedVariant;
     history.chosenVariantIndexes.push(index);
@@ -216,7 +229,8 @@ module.exports = () => {
         epsilon = 0.1,
         delay = 10,
         type,
-        decayFactor
+        decayFactor,
+        tau
       },
       index
     } = event.data;
@@ -254,7 +268,8 @@ module.exports = () => {
           variants: banditVariants,
           delay,
           index: i,
-          decayFactor
+          decayFactor,
+          tau
         });
 
         delayedTasks = flow(
