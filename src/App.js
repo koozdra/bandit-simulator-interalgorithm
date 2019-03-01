@@ -2,6 +2,7 @@ import React, { Component } from "react";
 import Chart from "react-c3-component";
 import "c3/c3.css";
 import { Button, Form, FormGroup, Collapse } from "reactstrap";
+const qs = require("qs");
 
 const blob = new Blob(["(" + require("./worker.js") + ")()"]);
 const {
@@ -16,7 +17,9 @@ const {
   zipAll,
   sum,
   get,
-  pullAt
+  pullAt,
+  tail,
+  join
 } = require("lodash/fp");
 const mapWithIndex = require("lodash/fp/map").convert({ cap: false });
 
@@ -40,12 +43,13 @@ function simulate(candidates, pullsPerSimulation) {
       worker.addEventListener("message", event => {
         const { data, index: indexFromWorker } = event.data;
 
-        const [cumulativeReward, cumulativeRegret] = data;
+        const [cumulativeReward, cumulativeRegret, bestVariantUsage] = data;
 
         outstandingSimulations -= 1;
         output = flow(
           set(`cumulativeReward.${indexFromWorker}`, cumulativeReward),
-          set(`cumulativeRegret.${indexFromWorker}`, cumulativeRegret)
+          set(`cumulativeRegret.${indexFromWorker}`, cumulativeRegret),
+          set(`bestVariantUsage.${indexFromWorker}`, bestVariantUsage)
         )(output);
 
         if (outstandingSimulations === 0) {
@@ -71,7 +75,8 @@ function CandidateAlgorithm(props) {
     "epsilon-greedy-complement-explore":
       "Epsilon Greedy with Complement Explore",
     "epsilon-greedy-decay": "Epsilon Greedy Decay",
-    softmax: "Softmax"
+    softmax: "Softmax",
+    ucb: "UCB"
   };
   const algorithmTypes = keys(algorithms);
   const { variants = [] } = candidate;
@@ -296,6 +301,19 @@ class App extends Component {
       isOpenBookmarks: false
     };
 
+    const bookmarkJson = flow(
+      tail,
+      join(""),
+      qs.parse,
+      get("bookmark")
+    )(window.location.search);
+
+    if (bookmarkJson) {
+      this.state.candidates = JSON.parse(bookmarkJson);
+    }
+
+    console.log("in constructor");
+
     bindAll(["addCandidate", "stateChange"])(this);
   }
 
@@ -315,10 +333,21 @@ class App extends Component {
       outstandingSimulations,
       chartDataCumulativeRegret,
       chartDataCumulativeReward,
+      chartDataBestVariantUsage,
       numSimulations,
       pullsPerSimulation,
       isOpenBookmarks
     } = this.state;
+
+    const bookmarkQueryParam = flow(JSON.stringify)(this.state.candidates);
+
+    const link = `${window.location.origin}${
+      window.location.pathname
+    }?bookmark=${bookmarkQueryParam}`;
+
+    const shortenUrl = `http://tinyurl.com/create.php?source=&submit=Make+TinyURL%21&alias=&url=${encodeURI(
+      link
+    )}`;
 
     return (
       <div className="App">
@@ -330,6 +359,155 @@ class App extends Component {
         <Collapse isOpen={isOpenBookmarks}>
           Bookmarks:{" "}
           <div style={{ paddingLeft: 10 }}>
+            <a
+              href="#"
+              onClick={() => {
+                const template = {
+                  variants: [
+                    { ev: 0.3, r: 1 },
+                    { ev: 0.4, r: 1 },
+                    { ev: 0.7, r: 1 },
+                    { ev: 0.9, r: 1 }
+                  ],
+                  minVisits: "10",
+                  epsilon: "0.1",
+                  delay: 10
+                };
+                const candidates = [
+                  {
+                    type: "epsilon-greedy",
+                    tau: "0.1",
+                    ...template
+                  },
+                  {
+                    type: "softmax",
+                    tau: "0.1",
+                    ...template
+                  },
+                  {
+                    type: "epsilon-greedy-decay",
+                    decayFactor: "7",
+                    ...template
+                  },
+                  {
+                    type: "ucb",
+                    ...template
+                  }
+                ];
+                this.setState({ candidates });
+              }}
+            >
+              Softmax vs Epsilon Greedy vs Epsilon Greedy Decay vs UCB (4
+              variants)
+            </a>
+            <br />
+            <a
+              href="#"
+              onClick={() => {
+                const template = {
+                  variants: [
+                    { ev: 0.1, r: 1 },
+                    { ev: 0.1, r: 1 },
+                    { ev: 0.2, r: 1 },
+                    { ev: 0.3, r: 1 },
+                    { ev: 0.4, r: 1 },
+                    { ev: 0.5, r: 1 },
+                    { ev: 0.6, r: 1 },
+                    { ev: 0.7, r: 1 },
+                    { ev: 0.8, r: 1 },
+                    { ev: 0.9, r: 1 }
+                  ],
+                  minVisits: "10",
+                  epsilon: "0.1",
+                  delay: 10
+                };
+                const candidates = [
+                  {
+                    type: "epsilon-greedy",
+                    tau: "0.1",
+                    ...template
+                  },
+                  {
+                    type: "softmax",
+                    tau: "0.1",
+                    ...template
+                  },
+                  {
+                    type: "epsilon-greedy-decay",
+                    decayFactor: "7",
+                    ...template
+                  },
+                  {
+                    type: "ucb",
+                    ...template
+                  }
+                ];
+                this.setState({ candidates });
+              }}
+            >
+              Softmax vs Epsilon Greedy vs Epsilon Greedy Decay vs UCB (10
+              variants)
+            </a>
+            <br />
+            <a
+              href="#"
+              onClick={() => {
+                const template = {
+                  variants: [
+                    { ev: 0.1, r: 1 },
+                    { ev: 0.1, r: 1 },
+                    { ev: 0.2, r: 1 },
+                    { ev: 0.3, r: 1 },
+                    { ev: 0.4, r: 1 },
+                    { ev: 0.5, r: 1 },
+                    { ev: 0.6, r: 1 },
+                    { ev: 0.7, r: 1 },
+                    { ev: 0.8, r: 1 },
+                    { ev: 0.8, r: 1 },
+                    { ev: 0.1, r: 1 },
+                    { ev: 0.1, r: 1 },
+                    { ev: 0.2, r: 1 },
+                    { ev: 0.3, r: 1 },
+                    { ev: 0.4, r: 1 },
+                    { ev: 0.5, r: 1 },
+                    { ev: 0.6, r: 1 },
+                    { ev: 0.7, r: 1 },
+                    { ev: 0.8, r: 1 },
+                    { ev: 0.9, r: 1 }
+                  ],
+                  minVisits: "10",
+                  epsilon: "0.1",
+                  delay: 10
+                };
+                const candidates = [
+                  {
+                    type: "epsilon-greedy",
+                    tau: "0.1",
+                    ...template
+                  },
+                  {
+                    type: "softmax",
+                    tau: "0.1",
+                    ...template
+                  },
+                  {
+                    type: "epsilon-greedy-decay",
+                    decayFactor: "7",
+                    ...template
+                  },
+                  {
+                    type: "ucb",
+                    ...template
+                  }
+                ];
+                this.setState({ candidates });
+              }}
+            >
+              Softmax vs Epsilon Greedy vs Epsilon Greedy Decay vs UCB (20
+              variants)
+            </a>
+            <br />
+            <br />
             <a
               href="#"
               onClick={() => {
@@ -352,79 +530,7 @@ class App extends Component {
                 this.setState({ candidates });
               }}
             >
-              Different values for epsilon (four variants)
-            </a>
-            <br />
-            <a
-              href="#"
-              onClick={() => {
-                const template = {
-                  variants: [
-                    { ev: 0.1, r: 1 },
-                    { ev: 0.2, r: 1 },
-                    { ev: 0.3, r: 1 },
-                    { ev: 0.4, r: 1 },
-                    { ev: 0.5, r: 1 },
-                    { ev: 0.6, r: 1 },
-                    { ev: 0.7, r: 1 },
-                    { ev: 0.9, r: 1 }
-                  ],
-                  minVisits: "10",
-                  delay: "10"
-                };
-                const candidates = [
-                  { type: "epsilon-greedy", epsilon: "0.1", ...template },
-                  {
-                    type: "epsilon-greedy-decay",
-                    decayFactor: "7",
-                    ...template
-                  }
-                ];
-                this.setState({ candidates });
-              }}
-            >
-              Epsilon greedy vs decay (nine variants)
-            </a>
-            <br />
-            <a
-              href="#"
-              onClick={() => {
-                const template = {
-                  variants: [
-                    { ev: 0.3, r: 1 },
-                    { ev: 0.4, r: 1 },
-                    { ev: 0.5, r: 1 },
-                    { ev: 0.6, r: 1 }
-                  ],
-                  minVisits: "10",
-                  delay: "10"
-                };
-                const candidates = [
-                  {
-                    type: "epsilon-greedy-decay",
-                    decayFactor: "1",
-                    ...template
-                  },
-                  {
-                    type: "epsilon-greedy-decay",
-                    decayFactor: "4",
-                    ...template
-                  },
-                  {
-                    type: "epsilon-greedy-decay",
-                    decayFactor: "7",
-                    ...template
-                  },
-                  {
-                    type: "epsilon-greedy-decay",
-                    decayFactor: "15",
-                    ...template
-                  }
-                ];
-                this.setState({ candidates });
-              }}
-            >
-              Epsilon greedy decay with different decay factors
+              Epsilon Greedy (different epsilon, four variants)
             </a>
             <br />
             <a
@@ -468,9 +574,83 @@ class App extends Component {
                 this.setState({ candidates });
               }}
             >
-              Epsilon greedy with different delays
+              Epsilon Greedy (different delays)
             </a>
             <br />
+            <br />
+            <a
+              href="#"
+              onClick={() => {
+                const template = {
+                  variants: [
+                    { ev: 0.1, r: 1 },
+                    { ev: 0.2, r: 1 },
+                    { ev: 0.3, r: 1 },
+                    { ev: 0.4, r: 1 },
+                    { ev: 0.5, r: 1 },
+                    { ev: 0.6, r: 1 },
+                    { ev: 0.7, r: 1 },
+                    { ev: 0.9, r: 1 }
+                  ],
+                  minVisits: "10",
+                  delay: "10"
+                };
+                const candidates = [
+                  { type: "epsilon-greedy", epsilon: "0.1", ...template },
+                  {
+                    type: "epsilon-greedy-decay",
+                    decayFactor: "7",
+                    ...template
+                  }
+                ];
+                this.setState({ candidates });
+              }}
+            >
+              Epsilon Greedy vs Epsilon Greedy Decay (nine variants)
+            </a>
+            <br />
+            <a
+              href="#"
+              onClick={() => {
+                const template = {
+                  variants: [
+                    { ev: 0.3, r: 1 },
+                    { ev: 0.4, r: 1 },
+                    { ev: 0.5, r: 1 },
+                    { ev: 0.6, r: 1 }
+                  ],
+                  minVisits: "10",
+                  delay: "10"
+                };
+                const candidates = [
+                  {
+                    type: "epsilon-greedy-decay",
+                    decayFactor: "1",
+                    ...template
+                  },
+                  {
+                    type: "epsilon-greedy-decay",
+                    decayFactor: "4",
+                    ...template
+                  },
+                  {
+                    type: "epsilon-greedy-decay",
+                    decayFactor: "7",
+                    ...template
+                  },
+                  {
+                    type: "epsilon-greedy-decay",
+                    decayFactor: "15",
+                    ...template
+                  }
+                ];
+                this.setState({ candidates });
+              }}
+            >
+              Epsilon Greedy Decay (different decay factors)
+            </a>
+            <br />
+
             <a
               href="#"
               onClick={() => {
@@ -500,8 +680,9 @@ class App extends Component {
                 this.setState({ candidates });
               }}
             >
-              Epsilon greedy vs epsilon greedy with complement explore
+              Epsilon Greedy vs Epsilon Greedy with complement explore
             </a>
+            <br />
             <br />
             <a
               href="#"
@@ -518,6 +699,11 @@ class App extends Component {
                   delay: 10
                 };
                 const candidates = [
+                  {
+                    type: "softmax",
+                    tau: "0.01",
+                    ...template
+                  },
                   {
                     type: "softmax",
                     tau: "0.1",
@@ -552,9 +738,11 @@ class App extends Component {
                 this.setState({ candidates });
               }}
             >
-              Softmax with different temperatures
+              Softmax (different temperatures)
             </a>
             <br />
+            <br />
+
             <a
               href="#"
               onClick={() => {
@@ -566,30 +754,45 @@ class App extends Component {
                     { ev: 0.9, r: 1 }
                   ],
                   minVisits: "10",
-                  epsilon: "0.1",
-                  delay: 10
+                  epsilon: "0.1"
                 };
                 const candidates = [
                   {
-                    type: "softmax",
-                    tau: "0.1",
+                    type: "ucb",
+                    delay: 10,
                     ...template
                   },
                   {
-                    type: "epsilon-greedy",
-                    tau: "0.1",
+                    type: "ucb",
+                    delay: 30,
                     ...template
                   },
                   {
-                    type: "epsilon-greedy-decay",
-                    decayFactor: "7",
+                    type: "ucb",
+                    delay: 60,
+                    ...template
+                  },
+                  {
+                    type: "ucb",
+                    delay: 100,
+                    ...template
+                  },
+                  {
+                    type: "ucb",
+                    delay: 200,
                     ...template
                   }
                 ];
                 this.setState({ candidates });
               }}
             >
-              Softmax vs Epsilon Greedy vs Epsilon Greedy Decay
+              UCB (different delays)
+            </a>
+            <br />
+            <br />
+
+            <a target="_blank" href={shortenUrl}>
+              Create bookmark (tinyURL)
             </a>
           </div>
         </Collapse>
@@ -748,6 +951,12 @@ class App extends Component {
                   "Cumulative Reward"
                 )(simulationData)
               },
+              chartDataBestVariantUsage: {
+                columns: buildChartData(
+                  "bestVariantUsage",
+                  "Best Variant Usage"
+                )(simulationData)
+              },
               chartDataCumulativeRegret: {
                 columns: buildChartData(
                   "cumulativeRegret",
@@ -769,7 +978,8 @@ class App extends Component {
               onClick={() =>
                 this.setState({
                   chartDataCumulativeReward: undefined,
-                  chartDataCumulativeRegret: undefined
+                  chartDataCumulativeRegret: undefined,
+                  chartDataBestVariantUsage: undefined
                 })
               }
             >
@@ -789,6 +999,18 @@ class App extends Component {
                   <Chart
                     config={{
                       data: chartDataCumulativeReward
+                    }}
+                  />
+                </div>
+              </React.Fragment>
+            )}
+            {chartDataBestVariantUsage && (
+              <React.Fragment>
+                <h3>Best Variant Usage</h3>
+                <div style={{ width: "100%", height: "400px" }}>
+                  <Chart
+                    config={{
+                      data: chartDataBestVariantUsage
                     }}
                   />
                 </div>

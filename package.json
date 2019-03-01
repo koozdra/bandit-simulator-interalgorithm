@@ -6,6 +6,7 @@
     "bootstrap": "^4.3.1",
     "c3": "^0.6.12",
     "lodash": "^4.17.11",
+    "qs": "^6.6.0",
     "react": "^16.8.3",
     "react-c3-component": "^1.4.0",
     "react-dom": "^16.8.3",
@@ -21,7 +22,7 @@
   "eslintConfig": {
     "extends": "react-app"
   },
-  "homepage": "https://s3.amazonaws.com/change-assets/dimitri/bandit/interalgorithm/v3",
+  "homepage": "https://s3.amazonaws.com/change-assets/dimitri/bandit/interalgorithm/v5",
   "browserslist": [
     ">0.2%",
     "not dead",

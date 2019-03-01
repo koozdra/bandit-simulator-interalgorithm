@@ -12,6 +12,8 @@ module.exports = () => {
     maxBy,
     get,
     filter,
+    head,
+    tail,
     sum,
     merge,
     isEmpty,
@@ -31,6 +33,18 @@ module.exports = () => {
   const reset = () => {
     history = { chosenVariantIndexes: [], rewards: [] };
     delayedTasks = [];
+  };
+
+  const cumulativeSum = list => {
+    const h = head(list);
+    const t = tail(list);
+    return t.reduce(
+      (acc, x, index) => {
+        acc.push(acc[index] + x);
+        return acc;
+      },
+      [h]
+    );
   };
 
   reset();
@@ -176,6 +190,33 @@ module.exports = () => {
         0
       );
       return variants[selectedVariantIndex];
+    },
+    ucb: ({ variants, minExploreVisits }) => {
+      const variantsBelowMinVisits = filter(
+        variant => variant.bandit.pulls < minExploreVisits
+      )(variants);
+
+      if (!isEmpty(variantsBelowMinVisits)) {
+        return sample(variantsBelowMinVisits);
+      }
+
+      const totalPulls = flow(
+        map(getOr(0, "bandit.pulls")),
+        sum
+      )(variants);
+
+      return flow(
+        map(variant => {
+          const expectedValue = variantExpectedValue(variant);
+          // TODO be careful of pulls being zero
+          const boost = Math.sqrt(
+            (2 * Math.log(totalPulls)) / variant.bandit.pulls
+          );
+          return [variant, expectedValue + boost];
+        }),
+        maxBy(a => a[1]),
+        a => a[0]
+      )(variants);
     }
   };
 
@@ -207,6 +248,7 @@ module.exports = () => {
         selectedVariant.bandit.rewards += reward;
         history.rewards.push(1);
       };
+
       delayedTasks.push({ step: step + delay, thunk });
     } else {
       history.rewards.push(0);
@@ -267,7 +309,7 @@ module.exports = () => {
           minVisits,
           variants: banditVariants,
           delay,
-          index: i,
+          step: i,
           decayFactor,
           tau
         });
@@ -283,7 +325,7 @@ module.exports = () => {
       const dataPoints = 100;
 
       const cumulativeRewards = flow(
-        reduce((r, a) => (r.push(a + (last(r) || 0)), r), []),
+        cumulativeSum,
         chunk(rewards.length / dataPoints),
         map(last)
       )(rewards);
@@ -295,16 +337,29 @@ module.exports = () => {
 
       const cumulativeRegret = flow(
         map(selectedIndex => (selectedIndex !== bestVariantIndex ? 1 : 0)),
-        reduce((r, a) => (r.push(a + (last(r) || 0)), r), []),
+        cumulativeSum,
         chunk(chosenVariantIndexes.length / dataPoints),
         map(last)
       )(chosenVariantIndexes);
 
-      // console.log(bestVariantIndex, chosenVariantIndexes);
+      let bestVariantUsageCount = 0;
+      const bestVariantUsage = chosenVariantIndexes.map(
+        (selectedIndex, index) => {
+          if (selectedIndex === bestVariantIndex) {
+            bestVariantUsageCount += 1;
+          }
+          return bestVariantUsageCount / (index + 1);
+        }
+      );
+
+      const bestVariantUsageOutput = flow(
+        chunk(chosenVariantIndexes.length / dataPoints),
+        map(last)
+      )(bestVariantUsage);
 
       self.postMessage({
         messageType: "runComplete",
-        data: [cumulativeRewards, cumulativeRegret],
+        data: [cumulativeRewards, cumulativeRegret, bestVariantUsageOutput],
         index
       });
     }
